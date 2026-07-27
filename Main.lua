@@ -7,6 +7,13 @@ local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
+-- ScreenGui Container
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "DeveloperConsoleGui"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.Parent = playerGui
+
 -- Common Locals
 local Main, Lib, Apps, Settings -- Main Containers
 local Explorer, Properties, ScriptViewer, Notebook -- Major Apps
