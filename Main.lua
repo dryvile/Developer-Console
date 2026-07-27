@@ -57,13 +57,14 @@ local function toggleFly(enable, customSpeed)
             local cameraDirection = (camera.Focus.Position - camera.CFrame.Position).Unit
             local flySpeed = customSpeed or 1
             
-            -- Read player WASD/Joystick movement relative to camera direction
+            -- Mobile & PC Direction Handling
             local moveDir = humanoid.MoveDirection
             local movementVector = Vector3.new()
 
-            if moveDir.Magnitude > 0 then
-                local moveLocal = camera.CFrame:VectorToObjectSpace(moveDir)
-                movementVector = (camera.CFrame.RightVector * moveLocal.X) - (camera.CFrame.LookVector * moveLocal.Z)
+            if moveDir.Magnitude > 0.05 then
+                local cameraCF = camera.CFrame
+                local moveLocal = cameraCF:VectorToObjectSpace(moveDir)
+                movementVector = (cameraCF.RightVector * moveLocal.X) - (cameraCF.LookVector * moveLocal.Z)
                 if movementVector.Magnitude > 0 then
                     movementVector = movementVector.Unit
                 end
@@ -76,7 +77,7 @@ local function toggleFly(enable, customSpeed)
             local damping = 750 + flySpeed * 0.2
 
             local nextTiltStep
-            if movementVector == Vector3.new() then
+            if movementVector.Magnitude < 0.05 then
                 stationaryFrames = stationaryFrames + 1
                 nextTiltStep = 1
                 if (hrp.Position - lastPosition).Magnitude > 6 and stationaryFrames >= 4 then
