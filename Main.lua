@@ -2,6 +2,11 @@
 	Console Module
 ]]
 
+-- Roblox Services & Local Player References
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
 -- Common Locals
 local Main, Lib, Apps, Settings -- Main Containers
 local Explorer, Properties, ScriptViewer, Notebook -- Major Apps
@@ -544,8 +549,7 @@ local function main()
 		local AutoScroll = false
 
 		local LogService = game:GetService("LogService")
-		local Players = game:GetService("Players")
-		local LocalPlayer = Players.LocalPlayer
+		local LocalPlayer = player
 		local Mouse = LocalPlayer:GetMouse()
 		local UserInputService = game:GetService("UserInputService")
 		local RunService = game:GetService("RunService")
