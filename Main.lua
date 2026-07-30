@@ -40,6 +40,7 @@ label.TextScaled = false
 label.TextSize = 12
 label.TextStrokeColor3 = Color3.fromRGB(60, 60, 60)
 label.TextStrokeTransparency = 0
+label.TextStrokeTransparency = 0
 label.TextTransparency = 0
 label.TextWrap = true
 label.TextWrapped = true
@@ -117,9 +118,24 @@ end
 
 local function clickGuiButton(button)
 	if not button then return end
+
+	-- Firesignal execution
+	if firesignal then
+		pcall(function() firesignal(button.Activated) end)
+		pcall(function() firesignal(button.MouseButton1Click) end)
+		pcall(function() firesignal(button.TouchTap) end)
+	end
+
+	-- Getconnections execution fallback
+	if getconnections then
+		for _, conn in pairs(getconnections(button.Activated)) do pcall(function() conn:Fire() end) end
+		for _, conn in pairs(getconnections(button.MouseButton1Click)) do pcall(function() conn:Fire() end) end
+		for _, conn in pairs(getconnections(button.TouchTap)) do pcall(function() conn:Fire() end) end
+	end
+
+	-- Virtual Touch Fallback
 	local pos = button.AbsolutePosition
 	local size = button.AbsoluteSize
-
 	local x = pos.X + (size.X / 2)
 	local y = pos.Y + (size.Y / 2) + 36
 
@@ -128,12 +144,6 @@ local function clickGuiButton(button)
 		task.wait(0.05)
 		VirtualInputManager:SendTouchEvent(1, Enum.UserInputState.End, x, y)
 	end)
-
-	if firesignal then
-		pcall(function() firesignal(button.Activated) end)
-		pcall(function() firesignal(button.MouseButton1Click) end)
-		pcall(function() firesignal(button.TouchTap) end)
-	end
 end
 
 local function runLoop()
@@ -161,36 +171,32 @@ local function runLoop()
 		while isToggled do
 			if isCarDestroyed() then
 				-- Locate Dealership button dynamically or via path
-				local dealership = playerGui:FindFirstChild("Dealership", true)
-				if not (dealership and dealership:IsA("GuiButton")) then
-					local screen = playerGui:FindFirstChild("Screen")
-					if screen then
-						local topbar = screen:FindFirstChild("Topbar")
-						local holder = topbar and topbar:FindFirstChild("Holder")
-						local menu = holder and holder:FindFirstChild("menu")
-						dealership = menu and menu:FindFirstChild("Dealership")
-					end
+				local dealership = nil
+				local screen = playerGui:FindFirstChild("Screen")
+				if screen then
+					local topbar = screen:FindFirstChild("Topbar")
+					local holder = topbar and topbar:FindFirstChild("Holder")
+					local menu = holder and holder:FindFirstChild("menu")
+					dealership = menu and menu:FindFirstChild("Dealership")
+				end
+				if not dealership then
+					dealership = playerGui:FindFirstChild("Dealership", true)
 				end
 
-				if dealership then
+				if dealership and dealership:IsA("GuiButton") then
 					clickGuiButton(dealership)
 				end
 
 				-- 3 Second Delay between pressing Dealership and Spawn
 				task.wait(3)
 
-				-- Wait for Respawn cooldown to finish hitting nothing
-				while isToggled do
-					local targetBtn, cooldownLabel = findRespawnElements()
+				-- Check/click Respawn button if present and finished cooldown
+				local targetBtn, cooldownLabel = findRespawnElements()
+				if targetBtn then
 					local isCooldownFinished = false
-
-					if targetBtn or cooldownLabel then
-						if cooldownLabel and cooldownLabel:IsA("TextLabel") then
-							local text = cooldownLabel.Text
-							if text == "" or not string.match(text, "%d+") or not cooldownLabel.Visible then
-								isCooldownFinished = true
-							end
-						else
+					if cooldownLabel and cooldownLabel:IsA("TextLabel") then
+						local text = cooldownLabel.Text
+						if text == "" or not string.match(text, "%d+") or not cooldownLabel.Visible then
 							isCooldownFinished = true
 						end
 					else
@@ -198,10 +204,9 @@ local function runLoop()
 					end
 
 					if isCooldownFinished then
-						break
+						clickGuiButton(targetBtn)
+						task.wait(0.5)
 					end
-
-					task.wait(0.1)
 				end
 
 				-- Locate and Activate Spawn Button
