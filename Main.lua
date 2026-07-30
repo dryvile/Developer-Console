@@ -1,134 +1,312 @@
 local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local TweenService = game:GetService("TweenService")
+
 local player = Players.LocalPlayer
+local playerGui = player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui")
 
-local isFlying = false
+-- Create ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ToggleMenuGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
 
-local function setCollisionGroupRecursive(parent, groupName)
-    for _, descendant in pairs(parent:GetDescendants()) do
-        if descendant:IsA("BasePart") then
-            -- PhysicsService call retained, reference to HDAdminMain removed
-        end
-    end
+-- Create Main Frame
+local frame = Instance.new("Frame")
+frame.Name = "Frame"
+frame.Size = UDim2.new(0, 280, 0, 42)
+frame.Position = UDim2.new(0.5, -140, 0.4, 0)
+frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+frame.BackgroundTransparency = 0
+frame.BorderColor3 = Color3.fromRGB(27, 42, 53)
+frame.BorderMode = Enum.BorderMode.Outline
+frame.BorderSizePixel = 1
+frame.Style = Enum.FrameStyle.DropShadow
+frame.ZIndex = 4
+frame.Interactable = true
+frame.Parent = screenGui
+
+-- Title Label
+local label = Instance.new("TextLabel")
+label.Name = "Label"
+label.Size = UDim2.new(1, -65, 1, 0)
+label.Position = UDim2.new(0, 12, 0, 0)
+label.BackgroundTransparency = 1
+label.Text = "Auto Destroy Car"
+label.TextColor3 = Color3.fromRGB(235, 235, 235)
+label.FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+label.TextScaled = false
+label.TextSize = 12
+label.TextStrokeColor3 = Color3.fromRGB(60, 60, 60)
+label.TextStrokeTransparency = 0
+label.TextTransparency = 0
+label.TextWrap = true
+label.TextWrapped = true
+label.TextXAlignment = Enum.TextXAlignment.Left
+label.ZIndex = 5
+label.Parent = frame
+
+-- Toggle Switch Background Frame
+local toggleFrame = Instance.new("Frame")
+toggleFrame.Name = "ToggleFrame"
+toggleFrame.Size = UDim2.new(0, 44, 0, 22)
+toggleFrame.Position = UDim2.new(1, -54, 0.5, -11)
+toggleFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+toggleFrame.BackgroundTransparency = 0
+toggleFrame.BorderColor3 = Color3.fromRGB(27, 42, 53)
+toggleFrame.BorderMode = Enum.BorderMode.Outline
+toggleFrame.BorderSizePixel = 1
+toggleFrame.Style = Enum.FrameStyle.DropShadow
+toggleFrame.ZIndex = 5
+toggleFrame.Interactable = true
+toggleFrame.Parent = frame
+
+-- Toggle Knob
+local knob = Instance.new("Frame")
+knob.Name = "Knob"
+knob.Size = UDim2.new(0, 16, 0, 16)
+knob.Position = UDim2.new(0, -3, 0.5, -8)
+knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+knob.BackgroundTransparency = 0
+knob.BorderColor3 = Color3.fromRGB(27, 42, 53)
+knob.BorderMode = Enum.BorderMode.Outline
+knob.BorderSizePixel = 1
+knob.Style = Enum.FrameStyle.DropShadow
+knob.ZIndex = 5
+knob.Interactable = true
+knob.Parent = toggleFrame
+
+-- Expanded Clickable TextButton overlay
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Name = "ToggleButton"
+toggleBtn.Size = UDim2.new(1, 16, 1, 16)
+toggleBtn.Position = UDim2.new(0, -8, 0, -8)
+toggleBtn.BackgroundTransparency = 1
+toggleBtn.Text = ""
+toggleBtn.AutoButtonColor = false
+toggleBtn.ZIndex = 7
+toggleBtn.Parent = toggleFrame
+
+-- State & Loop Logic
+local isToggled = false
+
+local function isCarDestroyed()
+	local carCollection = Workspace:FindFirstChild("CarCollection")
+	if not carCollection then return true end
+
+	local userFolder = carCollection:FindFirstChild(player.Name)
+	if not userFolder then return true end
+
+	local car = userFolder:FindFirstChild("Car")
+	if not car then return true end
+
+	local hasParts = car:FindFirstChildWhichIsA("BasePart", true) ~= nil
+	return not hasParts
 end
 
-local function toggleFly(enable, customSpeed)
-    local flyType = "fly"
-    
-    if not enable then
-        isFlying = false
-        return
-    end
+local function findRespawnElements()
+	local respawnGui = playerGui:FindFirstChild("Respawn", true) or playerGui:FindFirstChild("RespawnGui", true)
+	if not respawnGui then return nil, nil end
 
-    if isFlying then return end
-    isFlying = true
+	local targetBtn = respawnGui:FindFirstChild("Button", true) or respawnGui:FindFirstChildWhichIsA("TextButton", true) or respawnGui:FindFirstChildWhichIsA("ImageButton", true)
+	local cooldownLabel = respawnGui:FindFirstChild("Cooldown", true) or respawnGui:FindFirstChild("Timer", true) or respawnGui:FindFirstChildWhichIsA("TextLabel", true)
 
-    local character = player.Character or player.CharacterAdded:Wait()
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-
-    if not (hrp and humanoid) then
-        isFlying = false
-        return
-    end
-
-    local bodyPosition = Instance.new("BodyPosition")
-    bodyPosition.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bodyPosition.Position = hrp.Position + Vector3.new(0, 4, 0)
-    bodyPosition.Name = "HDAdminFlyForce"
-    bodyPosition.Parent = hrp
-
-    local bodyGyro = Instance.new("BodyGyro")
-    bodyGyro.D = 50
-    bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-    bodyGyro.P = 200
-    bodyGyro.Name = "HDAdminFlyGyro"
-    bodyGyro.CFrame = hrp.CFrame
-    bodyGyro.Parent = hrp
-
-    local tiltStep = 0
-    local stationaryFrames = 0
-    local lastTime = tick()
-    local lastPosition = hrp.Position
-
-    task.spawn(function()
-        while isFlying and humanoid and hrp do
-            local deltaTime = tick() - lastTime
-            local camera = workspace.CurrentCamera
-            local cameraDirection = (camera.Focus.Position - camera.CFrame.Position).Unit
-            local flySpeed = customSpeed or 1
-            
-            -- Mobile & PC Direction Handling
-            local moveDir = humanoid.MoveDirection
-            local movementVector = Vector3.new()
-
-            if moveDir.Magnitude > 0.05 then
-                local cameraCF = camera.CFrame
-                local moveLocal = cameraCF:VectorToObjectSpace(moveDir)
-                movementVector = (cameraCF.RightVector * moveLocal.X) - (cameraCF.LookVector * moveLocal.Z)
-                if movementVector.Magnitude > 0 then
-                    movementVector = movementVector.Unit
-                end
-            end
-
-            local movementCFrame = CFrame.new(movementVector * (flySpeed * 25 * deltaTime))
-            local currentPos = bodyPosition.Position
-            local targetCFrame = CFrame.new(currentPos, currentPos + cameraDirection) * movementCFrame
-            
-            local damping = 750 + flySpeed * 0.2
-
-            local nextTiltStep
-            if movementVector.Magnitude < 0.05 then
-                stationaryFrames = stationaryFrames + 1
-                nextTiltStep = 1
-                if (hrp.Position - lastPosition).Magnitude > 6 and stationaryFrames >= 4 then
-                    bodyPosition.Position = hrp.Position
-                end
-            else
-                bodyPosition.D = damping
-                nextTiltStep = tiltStep + 1
-                bodyPosition.Position = targetCFrame.Position
-                stationaryFrames = 0
-            end
-
-            tiltStep = math.abs(nextTiltStep) > 25 and 25 or nextTiltStep
-
-            if bodyPosition.D == damping then
-                local tiltAngle = tiltStep * movementVector.Z
-                bodyGyro.CFrame = targetCFrame * CFrame.Angles(math.rad(tiltAngle), 0, 0)
-            end
-
-            lastTime = tick()
-            lastPosition = hrp.Position
-            humanoid.PlatformStand = true
-            
-            task.wait()
-        end
-
-        bodyPosition:Destroy()
-        bodyGyro:Destroy()
-        if humanoid then
-            humanoid.PlatformStand = false
-        end
-        isFlying = false
-    end)
+	return targetBtn, cooldownLabel
 end
 
--- Player Chat Commands (;fly, ;fly <speed>, ;fly me, ;fly me <speed>, ;unfly)
-player.Chatted:Connect(function(msg)
-    local lowerMsg = string.lower(msg)
-    local args = string.split(lowerMsg, " ")
+local function clickGuiButton(button)
+	if not button then return end
+	local pos = button.AbsolutePosition
+	local size = button.AbsoluteSize
 
-    if args[1] == ";fly" then
-        local speed = nil
-        if args[2] == "me" then
-            if args[3] then
-                speed = tonumber(args[3])
-            end
-        elseif args[2] then
-            speed = tonumber(args[2])
-        end
-        toggleFly(true, speed)
-    elseif lowerMsg == ";unfly" or lowerMsg == ";unfly me" then
-        toggleFly(false)
-    end
+	local x = pos.X + (size.X / 2)
+	local y = pos.Y + (size.Y / 2) + 36
+
+	pcall(function()
+		VirtualInputManager:SendTouchEvent(1, Enum.UserInputState.Begin, x, y)
+		task.wait(0.05)
+		VirtualInputManager:SendTouchEvent(1, Enum.UserInputState.End, x, y)
+	end)
+
+	pcall(function()
+		VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 1)
+		task.wait(0.05)
+		VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 1)
+	end)
+
+	if firesignal then
+		pcall(function() firesignal(button.Activated) end)
+		pcall(function() firesignal(button.MouseButton1Click) end)
+		pcall(function() firesignal(button.TouchTap) end)
+	end
+end
+
+local function runLoop()
+	-- Loop 1: Transitions Deletion Loop
+	task.spawn(function()
+		while isToggled do
+			local transitions = playerGui:FindFirstChild("Transitions", true) or Workspace:FindFirstChild("Transitions", true)
+			if transitions then
+				local blackscreen = transitions:FindFirstChild("Blackscreen")
+				if blackscreen then
+					blackscreen:Destroy()
+				end
+
+				local fadeBlackscreen = transitions:FindFirstChild("FadeBlackscreen")
+				if fadeBlackscreen then
+					fadeBlackscreen:Destroy()
+				end
+			end
+			task.wait(0.1)
+		end
+	end)
+
+	-- Loop 2: Dealership & Spawn Handler (Single Click Action on Mobile)
+	task.spawn(function()
+		while isToggled do
+			if isCarDestroyed() then
+				-- Full precise hierarchy path based on your Explorer tree
+				local screen = playerGui:FindFirstChild("Screen")
+				if screen then
+					local topbar = screen:FindFirstChild("Topbar")
+					local holder = topbar and topbar:FindFirstChild("Holder")
+					local menu = holder and holder:FindFirstChild("menu")
+					local dealership = menu and menu:FindFirstChild("Dealership")
+
+					-- Activate the Dealership button once on mobile
+					if dealership then
+						clickGuiButton(dealership)
+					end
+				end
+
+				-- 3 Second Delay between pressing Dealership and Spawn
+				task.wait(3)
+
+				-- Wait for Respawn cooldown to finish hitting nothing
+				while isToggled do
+					local targetBtn, cooldownLabel = findRespawnElements()
+					local isCooldownFinished = false
+
+					if targetBtn or cooldownLabel then
+						if cooldownLabel and cooldownLabel:IsA("TextLabel") then
+							local text = cooldownLabel.Text
+							if text == "" or not string.match(text, "%d+") or not cooldownLabel.Visible then
+								isCooldownFinished = true
+							end
+						else
+							isCooldownFinished = true
+						end
+					else
+						isCooldownFinished = true
+					end
+
+					if isCooldownFinished then
+						break
+					end
+
+					task.wait(0.1)
+				end
+
+				-- Wait for Dealership Gui & Activate Spawn Button
+				local dealershipGui = playerGui:WaitForChild("Dealership", 5)
+				if dealershipGui then
+					local bottomBar = dealershipGui:WaitForChild("BottomBar", 5)
+					local spawnHolder = bottomBar and bottomBar:WaitForChild("Holder", 5)
+					local spawnButton = spawnHolder and spawnHolder:FindFirstChild("Spawn")
+
+					-- Small buffer to ensure button state registers
+					task.wait(0.2)
+
+					-- Activate the Spawn button once on mobile
+					if spawnButton then
+						clickGuiButton(spawnButton)
+					end
+				end
+
+				-- Wait until the car is actually spawned into workspace before allowing another click cycle
+				repeat
+					task.wait(0.5)
+				until not isToggled or not isCarDestroyed()
+			end
+
+			task.wait(1)
+		end
+	end)
+
+	-- Loop 3: Car Velocity Loop
+	task.spawn(function()
+		while isToggled do
+			-- Check if CarCollection exists in Workspace
+			local carCollection = Workspace:FindFirstChild("CarCollection")
+
+			if carCollection then
+				-- Check if a folder/model named after the player exists inside CarCollection
+				local userFolder = carCollection:FindFirstChild(player.Name)
+
+				if userFolder then
+					-- Check if there is an object named "Car" inside the player's folder
+					local car = userFolder:FindFirstChild("Car")
+
+					if car then
+						-- Find the PrimaryPart or root part of the car model
+						local rootPart = car.PrimaryPart or car:FindFirstChildWhichIsA("BasePart")
+
+						if rootPart then
+							-- Check if any valid BasePart still exists inside the car
+							local hasParts = car:FindFirstChildWhichIsA("BasePart", true) ~= nil
+							if not hasParts then
+								break
+							end
+
+							-- Launch upward with extreme velocity
+							if rootPart and rootPart.Parent then
+								rootPart.AssemblyLinearVelocity = Vector3.new(rootPart.AssemblyLinearVelocity.X, 150, rootPart.AssemblyLinearVelocity.Z)
+							end
+							task.wait(0.08)
+
+							-- Slam downward much harder with extreme velocity
+							if rootPart and rootPart.Parent then
+								rootPart.AssemblyLinearVelocity = Vector3.new(rootPart.AssemblyLinearVelocity.X, -300, rootPart.AssemblyLinearVelocity.Z)
+							end
+							task.wait(0.08)
+						else
+							task.wait(0.1)
+						end
+					else
+						task.wait(0.1)
+					end
+				else
+					task.wait(0.1)
+				end
+			else
+				task.wait(0.1)
+			end
+		end
+	end)
+end
+
+toggleBtn:GetAttributeChangedSignal("IsToggled"):Connect(function()
+	isToggled = toggleBtn:GetAttribute("IsToggled") or false
+
+	if isToggled then
+		runLoop()
+	end
+end)
+
+-- Tween Info for smooth animation
+local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+-- Listen for clicks to switch state and animate knob further
+toggleBtn.MouseButton1Click:Connect(function()
+	local currentState = toggleBtn:GetAttribute("IsToggled") or false
+	local newState = not currentState
+
+	toggleBtn:SetAttribute("IsToggled", newState)
+
+	local targetPosition = newState and UDim2.new(1, -13, 0.5, -8) or UDim2.new(0, -3, 0.5, -8)
+
+	TweenService:Create(knob, tweenInfo, {
+		Position = targetPosition
+	}):Play()
 end)
