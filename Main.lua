@@ -129,12 +129,6 @@ local function clickGuiButton(button)
 		VirtualInputManager:SendTouchEvent(1, Enum.UserInputState.End, x, y)
 	end)
 
-	pcall(function()
-		VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 1)
-		task.wait(0.05)
-		VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 1)
-	end)
-
 	if firesignal then
 		pcall(function() firesignal(button.Activated) end)
 		pcall(function() firesignal(button.MouseButton1Click) end)
@@ -162,22 +156,24 @@ local function runLoop()
 		end
 	end)
 
-	-- Loop 2: Dealership & Spawn Handler (Single Click Action on Mobile)
+	-- Loop 2: Dealership & Spawn Handler
 	task.spawn(function()
 		while isToggled do
 			if isCarDestroyed() then
-				-- Full precise hierarchy path based on your Explorer tree
-				local screen = playerGui:FindFirstChild("Screen")
-				if screen then
-					local topbar = screen:FindFirstChild("Topbar")
-					local holder = topbar and topbar:FindFirstChild("Holder")
-					local menu = holder and holder:FindFirstChild("menu")
-					local dealership = menu and menu:FindFirstChild("Dealership")
-
-					-- Activate the Dealership button once on mobile
-					if dealership then
-						clickGuiButton(dealership)
+				-- Locate Dealership button dynamically or via path
+				local dealership = playerGui:FindFirstChild("Dealership", true)
+				if not (dealership and dealership:IsA("GuiButton")) then
+					local screen = playerGui:FindFirstChild("Screen")
+					if screen then
+						local topbar = screen:FindFirstChild("Topbar")
+						local holder = topbar and topbar:FindFirstChild("Holder")
+						local menu = holder and holder:FindFirstChild("menu")
+						dealership = menu and menu:FindFirstChild("Dealership")
 					end
+				end
+
+				if dealership then
+					clickGuiButton(dealership)
 				end
 
 				-- 3 Second Delay between pressing Dealership and Spawn
@@ -208,29 +204,28 @@ local function runLoop()
 					task.wait(0.1)
 				end
 
-				-- Wait for Dealership Gui & Activate Spawn Button
-				local dealershipGui = playerGui:WaitForChild("Dealership", 5)
+				-- Locate and Activate Spawn Button
+				local dealershipGui = playerGui:FindFirstChild("Dealership", true) or playerGui:WaitForChild("Dealership", 5)
 				if dealershipGui then
-					local bottomBar = dealershipGui:WaitForChild("BottomBar", 5)
-					local spawnHolder = bottomBar and bottomBar:WaitForChild("Holder", 5)
-					local spawnButton = spawnHolder and spawnHolder:FindFirstChild("Spawn")
+					local spawnButton = dealershipGui:FindFirstChild("Spawn", true)
+					if not spawnButton then
+						local bottomBar = dealershipGui:FindFirstChild("BottomBar") or dealershipGui:WaitForChild("BottomBar", 2)
+						local spawnHolder = bottomBar and (bottomBar:FindFirstChild("Holder") or bottomBar:WaitForChild("Holder", 2))
+						spawnButton = spawnHolder and spawnHolder:FindFirstChild("Spawn")
+					end
 
-					-- Small buffer to ensure button state registers
 					task.wait(0.2)
 
-					-- Activate the Spawn button once on mobile
 					if spawnButton then
 						clickGuiButton(spawnButton)
 					end
 				end
 
-				-- Wait until the car is actually spawned into workspace before allowing another click cycle
-				repeat
-					task.wait(0.5)
-				until not isToggled or not isCarDestroyed()
+				-- Wait buffer to check if spawned
+				task.wait(1.5)
+			else
+				task.wait(0.5)
 			end
-
-			task.wait(1)
 		end
 	end)
 
